@@ -102,24 +102,25 @@ response = session.post(
 location = response.headers["Location"]
 auth_code = re.search(r"[?&]code=([^&]+)", location).group(1)
 
-# Step 5: Exchange auth code for tokens
+# Step 5: Exchange auth code for access token
 response = session.post(
     URLS["token"],
     data={
         "grant_type": "authorization_code",
         "redirect_uri": "https://fantasy.premierleague.com/",
-        "code": auth_code,
-        "code_verifier": code_verifier,
+        "code": auth_code,  # from the parsed redirect URL
+        "code_verifier": code_verifier,  # the original code_verifier generated at the start
         "client_id": "bfcbaf69-aade-4c1b-8f00-c1cb8a193030",
     },
 )
 
-tokens = response.json()
-print("Full token response:\n", tokens)  # <- Add this line to debug
+token_response = response.json()
+print("=== FULL TOKEN RESPONSE ===")
+print(token_response)
 
-print("=== FPL REFRESH TOKEN ===")
+# Now safely extract and print the refresh_token
+refresh_token = token_response.get("refresh_token")
+
+print("\n=== FPL REFRESH TOKEN ===")
 print(refresh_token)
 print("=== END REFRESH TOKEN ===")
-
-print("Your refresh_token is:\n")
-print(f"FPL_REFRESH={refresh_token}")
