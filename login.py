@@ -19,19 +19,16 @@ URLS = {
     "me": "https://fantasy.premierleague.com/api/me/",
 }
 
-
 def generate_code_verifier():
     return secrets.token_urlsafe(64)[:128]
-
 
 def generate_code_challenge(verifier):
     digest = hashlib.sha256(verifier.encode()).digest()
     return base64.urlsafe_b64encode(digest).decode().rstrip("=")
 
-
-code_verifier = generate_code_verifier()  # code_verifier for PKCE
-code_challenge = generate_code_challenge(code_verifier)  # code_challenge from the code_verifier
-initial_state = uuid.uuid4().hex  # random initial state for the OAuth flow
+code_verifier = generate_code_verifier()
+code_challenge = generate_code_challenge(code_verifier)
+initial_state = uuid.uuid4().hex
 
 session = requests.Session()
 
@@ -49,9 +46,7 @@ auth_response = session.get(URLS["auth"], params=params)
 login_html = auth_response.text
 
 access_token = re.search(r'"accessToken":"([^"]+)"', login_html).group(1)
-# need to read state here for when we resume the OAuth flow later on
 new_state = re.search(r'<input[^>]+name="state"[^>]+value="([^"]+)"', login_html).group(1)
-
 
 # Step 2: Use accessToken to get interaction id and token
 headers = {
@@ -62,14 +57,10 @@ response = session.post(URLS["start"], headers=headers).json()
 interaction_id = response["interactionId"]
 interaction_token = response["interactionToken"]
 
-
-# Step 3: log in with interaction tokens (requires 2 post requests)
+# Step 3: log in with interaction tokens (2 POST requests)
 response = session.post(
     URLS["login"],
-    headers={
-        "interactionId": interaction_id,
-        "interactionToken": interaction_token,
-    },
+    headers={"interactionId": interaction_id, "interactionToken": interaction_token},
     json={
         "id": response["id"],
         "eventName": "continue",
@@ -80,10 +71,7 @@ response = session.post(
 
 response = session.post(
     URLS["login"],
-    headers={
-        "interactionId": interaction_id,
-        "interactionToken": interaction_token,
-    },
+    headers={"interactionId": interaction_id, "interactionToken": interaction_token},
     json={
         "id": response.json()["id"],
         "nextEvent": {
@@ -104,32 +92,30 @@ response = session.post(
 )
 dv_response = response.json()["dvResponse"]
 
-
-# Step 4: Resume the login using the dv_response and handle redirect
+# Step 4: Resume login and handle redirect
 response = session.post(
     URLS["resume"],
-    data={
-        "dvResponse": dv_response,
-        "state": new_state,
-    },
+    data={"dvResponse": dv_response, "state": new_state},
     allow_redirects=False,
 )
 
 location = response.headers["Location"]
 auth_code = re.search(r"[?&]code=([^&]+)", location).group(1)
 
-# Step 5: Exchange auth code for access token
+# Step 5: Exchange auth code for tokens
 response = session.post(
     URLS["token"],
     data={
         "grant_type": "authorization_code",
         "redirect_uri": "https://fantasy.premierleague.com/",
-        "code": auth_code,  # from the parsed redirect URL
-        "code_verifier": code_verifier,  # the original code_verifier generated at the start
+        "code": auth_code,
+        "code_verifier": code_verifier,
         "client_id": "bfcbaf69-aade-4c1b-8f00-c1cb8a193030",
     },
 )
 
-access_token = response.json()["access_token"]
-response = session.get(URLS["me"], headers={"X-API-Authorization": f"Bearer {access_token}"})
-print(response.json())
+tokens = response.json()
+refresh_token = tokens.get("refresh_token")
+
+print("Your refresh_token is:\n")
+print(refresh_token)
