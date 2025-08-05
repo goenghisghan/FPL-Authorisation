@@ -1,11 +1,14 @@
-name: Refresh FPL Token (Manual)
+name: Refresh access token (hourly)
 
 on:
-  workflow_dispatch:  # Only runs when you manually trigger from GitHub UI
+  schedule:
+    - cron: '0 * * * *'  # Runs every hour at minute 0
+  workflow_dispatch:      # Still allows manual runs
 
 jobs:
   refresh-token:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
@@ -23,4 +26,3 @@ jobs:
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
           GIST_ID: ${{ secrets.GIST_ID }}
         run: python refresh_access.py
-
