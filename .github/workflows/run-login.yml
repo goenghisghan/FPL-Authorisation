@@ -1,0 +1,27 @@
+name: Run login.py to get FPL refresh_token
+
+on:
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  get-token:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install requests python-dotenv
+
+      - name: Run login.py
+        env:
+          EMAIL: ${{ secrets.EMAIL }}
+          PASSWORD: ${{ secrets.PASSWORD }}
+        run: |
+          python login.py
