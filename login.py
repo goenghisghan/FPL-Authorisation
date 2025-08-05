@@ -117,9 +117,9 @@ response = session.post(
 tokens = response.json()
 print("Full token response:\n", tokens)  # <- Add this line to debug
 
-refresh_token = tokens.get("refresh_token")
-print("\nYour refresh_token is:\n")
+print("=== FPL REFRESH TOKEN ===")
 print(refresh_token)
+print("=== END REFRESH TOKEN ===")
 
 print("Your refresh_token is:\n")
-print(refresh_token)
+print(f"FPL_REFRESH={refresh_token}")
