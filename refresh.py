@@ -2,59 +2,46 @@ import requests
 import os
 import json
 
-# Load environment variables
-gist_id = os.getenv("GIST_ID")  # e.g. abc1234567890defgh
-gist_token = os.getenv("GIST_TOKEN")  # stored in GitHub Secrets
+GIST_ID = os.environ["GIST_ID"]
+GITHUB_TOKEN = os.environ["GIST_TOKEN"]
+GIST_API_URL = f"https://api.github.com/gists/{GIST_ID}"
 
-gist_url = f"https://api.github.com/gists/{gist_id}"
-headers = {
-    "Authorization": f"Bearer {gist_token}",
-    "Accept": "application/vnd.github.v3+json"
-}
+# Step 1: Load existing tokens from the Gist
+headers = {"Authorization": f"Bearer {GITHUB_TOKEN}"}
+resp = requests.get(GIST_API_URL, headers=headers)
+gist_data = resp.json()
 
-# Step 1: Fetch the existing token JSON from the Gist
-response = requests.get(gist_url, headers=headers)
-data = response.json()
+# Load the content from the Gist file
+filename = list(gist_data["files"].keys())[0]
+tokens = json.loads(gist_data["files"][filename]["content"])
+refresh_token = tokens["refresh_token"]
 
-file_key = list(data["files"].keys())[0]
-token_json = json.loads(data["files"][file_key]["content"])
-
-refresh_token = token_json["refresh_token"]
-
-# Step 2: Use the refresh_token to get new tokens
+# Step 2: Refresh the tokens
 url = "https://account.premierleague.com/as/token"
-payload = {
+data = {
     "grant_type": "refresh_token",
     "refresh_token": refresh_token,
     "client_id": "bfcbaf69-aade-4c1b-8f00-c1cb8a193030",
 }
-headers_token = {"Content-Type": "application/x-www-form-urlencoded"}
+headers["Content-Type"] = "application/x-www-form-urlencoded"
 
-response = requests.post(url, data=payload, headers=headers_token)
-tokens = response.json()
+response = requests.post(url, data=data, headers=headers).json()
+new_access_token = response["access_token"]
+new_refresh_token = response["refresh_token"]
 
-# Optional: print access token for testing
-print("\n=== NEW ACCESS TOKEN (base64) ===")
-import base64
-print(base64.b64encode(tokens["access_token"].encode()).decode())
-print("=== END ===")
-
-# Step 3: Save updated tokens back to the Gist
-new_token_data = {
-    "refresh_token": tokens["refresh_token"],
-    "access_token": tokens["access_token"]
-}
+# Step 3: Save updated tokens back to Gist
+new_content = json.dumps({
+    "access_token": new_access_token,
+    "refresh_token": new_refresh_token,
+}, indent=2)
 
 update_payload = {
     "files": {
-        file_key: {
-            "content": json.dumps(new_token_data, indent=2)
+        filename: {
+            "content": new_content
         }
     }
 }
+update_resp = requests.patch(GIST_API_URL, headers=headers, json=update_payload)
 
-update_response = requests.patch(gist_url, headers=headers, json=update_payload)
-if update_response.status_code == 200:
-    print("✅ Token Gist updated successfully.")
-else:
-    print("❌ Failed to update Gist:", update_response.text)
+print("✅ Tokens successfully refreshed and stored in Gist.")
