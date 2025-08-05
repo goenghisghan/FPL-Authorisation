@@ -2,23 +2,23 @@ import requests
 import os
 import json
 
-# === Step 1: Load existing tokens from GitHub Gist ===
-
+# Load environment variables
 GIST_ID = os.environ["GIST_ID"]
 GITHUB_TOKEN = os.environ["GIST_TOKEN"]
 GIST_API_URL = f"https://api.github.com/gists/{GIST_ID}"
 
+# Step 1: Load tokens from Gist
 headers = {"Authorization": f"Bearer {GITHUB_TOKEN}"}
 resp = requests.get(GIST_API_URL, headers=headers)
-gist_data = resp.json()
+if resp.status_code != 200:
+    raise Exception(f"❌ Failed to fetch Gist: {resp.status_code}\n{resp.text}")
 
-# Extract the refresh_token from the Gist
+gist_data = resp.json()
 filename = list(gist_data["files"].keys())[0]
 tokens = json.loads(gist_data["files"][filename]["content"])
 refresh_token = tokens["refresh_token"]
 
-# === Step 2: Use refresh_token to request new tokens ===
-
+# Step 2: Use refresh_token to get new access_token AND refresh_token
 url = "https://account.premierleague.com/as/token"
 data = {
     "grant_type": "refresh_token",
@@ -27,26 +27,21 @@ data = {
 }
 headers["Content-Type"] = "application/x-www-form-urlencoded"
 
-# First get the raw response for debug purposes
-raw_response = requests.post(url, data=data, headers=headers)
-
-print("=== RAW RESPONSE TEXT ===")
-print("Status code:", raw_response.status_code)
-print(raw_response.text)
-print("=== END RAW RESPONSE ===")
-
-# Then parse as JSON
-response = raw_response.json()
-
-# === Step 3: Extract and update tokens ===
-
-if "access_token" not in response or "refresh_token" not in response:
+response = requests.post(url, data=data, headers=headers)
+if response.status_code != 200:
+    print("=== RAW RESPONSE TEXT ===")
+    print(response.status_code, response.text)
+    print("=== END RAW RESPONSE ===")
     raise Exception("❌ Failed to refresh token. Check logs above for details.")
 
-new_access_token = response["access_token"]
-new_refresh_token = response["refresh_token"]
+token_response = response.json()
+new_access_token = token_response.get("access_token")
+new_refresh_token = token_response.get("refresh_token")
 
-# Save new tokens back to Gist
+if not new_access_token or not new_refresh_token:
+    raise Exception("❌ Missing tokens in response.")
+
+# Step 3: Save updated tokens back to Gist
 new_content = json.dumps({
     "access_token": new_access_token,
     "refresh_token": new_refresh_token,
@@ -61,9 +56,7 @@ update_payload = {
 }
 
 update_resp = requests.patch(GIST_API_URL, headers=headers, json=update_payload)
+if update_resp.status_code != 200:
+    raise Exception(f"❌ Failed to update Gist: {update_resp.status_code}\n{update_resp.text}")
 
-if update_resp.status_code == 200:
-    print("✅ Tokens successfully refreshed and stored in Gist.")
-else:
-    print("❌ Failed to update Gist.")
-    print(update_resp.status_code, update_resp.text)
+print("✅ Refresh token and access token successfully updated in Gist.")
