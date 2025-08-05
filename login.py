@@ -115,12 +115,9 @@ response = session.post(
 )
 
 token_response = response.json()
-print("=== FULL TOKEN RESPONSE ===")
-print(token_response)
-
-# Now safely extract and print the refresh_token
 refresh_token = token_response.get("refresh_token")
+encoded_refresh = base64.b64encode(refresh_token.encode()).decode()
 
-print("\n=== FPL REFRESH TOKEN ===")
-print(refresh_token)
+print("\n=== FPL REFRESH TOKEN (BASE64) ===")
+print(encoded_refresh)
 print("=== END REFRESH TOKEN ===")
