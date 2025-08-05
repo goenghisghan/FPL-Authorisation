@@ -115,7 +115,11 @@ response = session.post(
 )
 
 tokens = response.json()
+print("Full token response:\n", tokens)  # <- Add this line to debug
+
 refresh_token = tokens.get("refresh_token")
+print("\nYour refresh_token is:\n")
+print(refresh_token)
 
 print("Your refresh_token is:\n")
 print(refresh_token)
