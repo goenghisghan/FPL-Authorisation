@@ -21,7 +21,9 @@ jobs:
 
       - name: Run login.py
         env:
-          EMAIL: ${{ secrets.EMAIL }}
-          PASSWORD: ${{ secrets.PASSWORD }}
+  GIST_ID: ${{ secrets.GIST_ID }}
+  GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+  EMAIL: ${{ secrets.EMAIL }}
+  PASSWORD: ${{ secrets.PASSWORD }}
         run: |
           python login.py
