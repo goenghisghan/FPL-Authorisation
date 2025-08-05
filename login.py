@@ -4,7 +4,7 @@ import os
 import re
 import secrets
 import uuid
-
+import json
 import requests
 from dotenv import load_dotenv
 
@@ -25,6 +25,35 @@ def generate_code_verifier():
 def generate_code_challenge(verifier):
     digest = hashlib.sha256(verifier.encode()).digest()
     return base64.urlsafe_b64encode(digest).decode().rstrip("=")
+
+def update_gist_with_tokens(access_token, refresh_token):
+    GIST_ID = os.environ["GIST_ID"]
+    GIST_TOKEN = os.environ["GIST_TOKEN"]
+    GIST_API_URL = f"https://api.github.com/gists/{GIST_ID}"
+
+    headers = {"Authorization": f"Bearer {GIST_TOKEN}"}
+    resp = requests.get(GIST_API_URL, headers=headers)
+    resp.raise_for_status()
+    gist_data = resp.json()
+
+    filename = list(gist_data["files"].keys())[0]
+
+    tokens_content = json.dumps({
+        "access_token": access_token,
+        "refresh_token": refresh_token
+    }, indent=2)
+
+    update_payload = {
+        "files": {
+            filename: {
+                "content": tokens_content
+            }
+        }
+    }
+
+    update_resp = requests.patch(GIST_API_URL, headers=headers, json=update_payload)
+    update_resp.raise_for_status()
+    print("✅ Tokens successfully saved to Gist.")
 
 code_verifier = generate_code_verifier()
 code_challenge = generate_code_challenge(code_verifier)
@@ -108,16 +137,18 @@ response = session.post(
     data={
         "grant_type": "authorization_code",
         "redirect_uri": "https://fantasy.premierleague.com/",
-        "code": auth_code,  # from the parsed redirect URL
-        "code_verifier": code_verifier,  # the original code_verifier generated at the start
+        "code": auth_code,
+        "code_verifier": code_verifier,
         "client_id": "bfcbaf69-aade-4c1b-8f00-c1cb8a193030",
     },
 )
-
+response.raise_for_status()
 token_response = response.json()
-refresh_token = token_response.get("refresh_token")
-encoded_refresh = base64.b64encode(refresh_token.encode()).decode()
 
-print("\n=== FPL REFRESH TOKEN (BASE64) ===")
-print(encoded_refresh)
-print("=== END REFRESH TOKEN ===")
+refresh_token = token_response.get("refresh_token")
+access_token = token_response.get("access_token")
+
+# Just update the gist directly with raw tokens, no encoding or printing
+update_gist_with_tokens(access_token, refresh_token)
+
+print("✅ Login complete and tokens saved to Gist.")
