@@ -6,16 +6,19 @@ GIST_ID = os.environ["GIST_ID"]
 GITHUB_TOKEN = os.environ["GIST_TOKEN"]
 GIST_API_URL = f"https://api.github.com/gists/{GIST_ID}"
 
-# Step 1: Load existing tokens from the Gist
+# Headers for GitHub API
 headers = {"Authorization": f"Bearer {GITHUB_TOKEN}"}
+
+# Step 1: Load tokens from the Gist
 resp = requests.get(GIST_API_URL, headers=headers)
 gist_data = resp.json()
 
 filename = list(gist_data["files"].keys())[0]
 tokens = json.loads(gist_data["files"][filename]["content"])
+
 refresh_token = tokens["refresh_token"]
 
-# Step 2: Refresh access token only
+# Step 2: Refresh the access token using the refresh token
 url = "https://account.premierleague.com/as/token"
 data = {
     "grant_type": "refresh_token",
@@ -25,20 +28,24 @@ data = {
 headers.update({"Content-Type": "application/x-www-form-urlencoded"})
 
 response = requests.post(url, data=data, headers=headers)
-response_data = response.json()
-
 if response.status_code != 200:
-    print("=== RAW RESPONSE TEXT ===")
-    print(response.text)
-    print("=== END RAW RESPONSE ===")
-    raise Exception("❌ Failed to refresh access token. Check logs above for details.")
+    print("Failed to refresh token:")
+    print(response.status_code, response.text)
+    raise Exception("Failed to refresh token")
 
-new_access_token = response_data["access_token"]
+token_response = response.json()
 
-# Step 3: Update Gist with new access_token but keep old refresh_token
-tokens["access_token"] = new_access_token
+new_access_token = token_response.get("access_token")
+new_refresh_token = token_response.get("refresh_token")
 
-new_content = json.dumps(tokens, indent=2)
+if not new_access_token or not new_refresh_token:
+    raise Exception("Missing tokens in response")
+
+# Step 3: Save the updated tokens back to the Gist
+new_content = json.dumps({
+    "access_token": new_access_token,
+    "refresh_token": new_refresh_token,
+}, indent=2)
 
 update_payload = {
     "files": {
@@ -47,10 +54,11 @@ update_payload = {
         }
     }
 }
-update_resp = requests.patch(GIST_API_URL, headers=headers, json=update_payload)
 
-if update_resp.status_code == 200:
-    print("✅ Access token successfully refreshed and updated in Gist.")
-else:
-    print("❌ Failed to update Gist with new access token.")
-    print(update_resp.text)
+update_resp = requests.patch(GIST_API_URL, headers=headers, json=update_payload)
+if update_resp.status_code != 200:
+    print("Failed to update Gist:")
+    print(update_resp.status_code, update_resp.text)
+    raise Exception("Failed to update Gist")
+
+print("✅ Access token refreshed and tokens updated in Gist.")
