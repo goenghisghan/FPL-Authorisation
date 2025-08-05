@@ -18,9 +18,9 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
-      - name: Run refresh.py
+      - name: Run refresh_access.py
         env:
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
           GIST_ID: ${{ secrets.GIST_ID }}
-        run: python refresh.py
+        run: python refresh_access.py
 
