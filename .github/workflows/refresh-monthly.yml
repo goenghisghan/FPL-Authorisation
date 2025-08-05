@@ -1,4 +1,4 @@
-name: Refresh Refresh Token (Monthly)
+name: Refresh refresh token (monthly)
 
 on:
   schedule:
