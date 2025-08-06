@@ -21,9 +21,9 @@ jobs:
 
       - name: Run login.py
         env:
-          GIST_ID: ${{ secrets.GIST_PLANKTON_ID }}
+          GIST_ID: ${{ secrets.GIST_ECOLI_ID }}
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
-          EMAIL: ${{ secrets.PLANKTON_EMAIL }}
-          PASSWORD: ${{ secrets.PLANKTON_PASSWORD }}
+          EMAIL: ${{ secrets.ECOLI_EMAIL }}
+          PASSWORD: ${{ secrets.ECOLI_PASSWORD }}
         run: |
           python login.py
