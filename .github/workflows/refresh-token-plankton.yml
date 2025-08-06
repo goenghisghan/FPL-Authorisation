@@ -1,4 +1,4 @@
-name: Refresh access token (hourly)
+name: Refresh Plankton access token (hourly)
 
 on:
   schedule:
