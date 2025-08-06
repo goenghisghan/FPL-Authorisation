@@ -119,6 +119,8 @@ response = session.post(
         "eventName": "continue",
     },
 )
+print("Login step response JSON:")
+print(response.json())
 dv_response = response.json()["dvResponse"]
 
 # Step 4: Resume login and handle redirect
