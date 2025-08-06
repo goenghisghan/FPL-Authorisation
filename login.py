@@ -27,9 +27,9 @@ def generate_code_challenge(verifier):
     return base64.urlsafe_b64encode(digest).decode().rstrip("=")
 
 def update_gist_with_tokens(access_token, refresh_token):
-    GIST_ID = os.environ["GIST_PLANKTON_ID"]
+    GIST_ID = os.environ["GIST_ID"]
     GIST_TOKEN = os.environ["GIST_TOKEN"]
-    GIST_API_URL = f"https://api.github.com/gists/{GIST_PLANKTON_ID}"
+    GIST_API_URL = f"https://api.github.com/gists/{GIST_ID}"
 
     headers = {"Authorization": f"Bearer {GIST_TOKEN}"}
     resp = requests.get(GIST_API_URL, headers=headers)
@@ -113,8 +113,8 @@ response = session.post(
         "parameters": {
             "buttonType": "form-submit",
             "buttonValue": "SIGNON",
-            "username": os.getenv("PLANKTON_EMAIL"),
-            "password": os.getenv("PLANKTON_PASSWORD"),
+            "username": os.getenv("EMAIL"),
+            "password": os.getenv("PASSWORD"),
         },
         "eventName": "continue",
     },
