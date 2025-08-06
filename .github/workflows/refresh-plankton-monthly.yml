@@ -1,4 +1,4 @@
-name: Refresh refresh token (monthly)
+name: Refresh Plankton refresh token (monthly)
 
 on:
   schedule:
@@ -23,6 +23,6 @@ jobs:
 
       - name: Run refresh_refresh.py
         env:
-          GIST_ID: ${{ secrets.GIST_ID }}
+          GIST_ID: ${{ secrets.GIST_PLANKTON_ID }}
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
         run: python refresh_refresh.py
