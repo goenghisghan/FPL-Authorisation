@@ -21,9 +21,9 @@ jobs:
 
       - name: Run login.py
         env:
-          GIST_ID: ${{ secrets.GIST_VERMIN_ID }}
+          GIST_ID: ${{ secrets.GIST_ALGAE_ID }}
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
-          EMAIL: ${{ secrets.VERMIN_EMAIL }}
-          PASSWORD: ${{ secrets.VERMIN_PASSWORD }}
+          EMAIL: ${{ secrets.ALGAE_EMAIL }}
+          PASSWORD: ${{ secrets.ALGAE_PASSWORD }}
         run: |
           python login.py
