@@ -1,4 +1,4 @@
-name: Refresh Plankton refresh token (monthly)
+name: Refresh Algae refresh token (monthly)
 
 on:
   schedule:
