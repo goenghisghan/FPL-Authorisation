@@ -60,6 +60,34 @@ code_challenge = generate_code_challenge(code_verifier)
 initial_state = uuid.uuid4().hex
 
 session = requests.Session()
+session.headers.update({
+    # Some IdP branches are UA/Accept-sensitive
+    "User-Agent": (
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+    ),
+    "Accept": "application/json, text/plain, */*",
+})
+
+def expect_json(resp: requests.Response) -> dict:
+    """Raise for HTTP errors and return JSON; if JSON fails, print diagnostics."""
+    try:
+        resp.raise_for_status()
+    except Exception:
+        # Print body to help debugging on CI
+        print("HTTP error from DaVinci endpoint:", file=sys.stderr)
+        print("Status:", resp.status_code, file=sys.stderr)
+        print("Headers:", dict(resp.headers), file=sys.stderr)
+        print("Body:", resp.text[:2000], file=sys.stderr)
+        raise
+    try:
+        return resp.json()
+    except ValueError:
+        print("Non-JSON response from DaVinci endpoint:", file=sys.stderr)
+        print("Status:", resp.status_code, file=sys.stderr)
+        print("Headers:", dict(resp.headers), file=sys.stderr)
+        print("Body:", resp.text[:2000], file=sys.stderr)
+        raise
 
 # Step 1: Request authorization page
 params = {
@@ -81,10 +109,31 @@ new_state = re.search(r'<input[^>]+name="state"[^>]+value="([^"]+)"', login_html
 headers = {
     "Authorization": f"Bearer {access_token}",
     "Content-Type": "application/json",
+    "Accept": "application/json",
 }
-response = session.post(URLS["start"], headers=headers).json()
-interaction_id = response["interactionId"]
-interaction_token = response["interactionToken"]
+start_resp = session.post(URLS["start"], headers=headers)
+data = expect_json(start_resp)
+
+# Log unexpected payloads
+if "interactionToken" not in data:
+    print("DaVinci /start payload did not include 'interactionToken'. Full payload:", file=sys.stderr)
+    print(json.dumps(data, indent=2)[:4000], file=sys.stderr)
+
+# Try common keys and then fail cleanly
+interaction_id = data.get("interactionId") or data.get("id")
+interaction_token = (
+    data.get("interactionToken")
+    or data.get("interactionJwt")
+    or data.get("token")
+)
+
+if not interaction_id or not interaction_token:
+    raise RuntimeError(
+        "Login flow changed: missing interactionId/interactionToken from /start. "
+        "See stderr for the raw payload. "
+        "This usually means the IdP returned an error or a different policy branch. "
+        "Try re-running locally to capture the exact payload."
+    )
 
 # Step 3: log in with interaction tokens (2 POST requests)
 response = session.post(
