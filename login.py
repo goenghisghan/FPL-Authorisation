@@ -141,7 +141,7 @@ response = session.post(
     URLS["login"],
     headers={"interactionId": interaction_id, "interactionToken": interaction_token},
     json={
-        "id": response["id"],
+        "id": data["id"],
         "eventName": "continue",
         "parameters": {"eventType": "polling"},
         "pollProps": {"status": "continue", "delayInMs": 10, "retriesAllowed": 1, "pollChallengeStatus": False},
