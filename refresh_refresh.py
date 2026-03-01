@@ -25,9 +25,9 @@ data = {
     "refresh_token": refresh_token,
     "client_id": "bfcbaf69-aade-4c1b-8f00-c1cb8a193030",
 }
-headers["Content-Type"] = "application/x-www-form-urlencoded"
+fpl_headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
-response = requests.post(url, data=data, headers=headers)
+response = requests.post(url, data=data, headers=fpl_headers)
 if response.status_code != 200:
     print("=== RAW RESPONSE TEXT ===")
     print(response.status_code, response.text)

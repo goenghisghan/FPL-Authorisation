@@ -47,10 +47,12 @@ if response.status_code != 200:
 
 token_response = response.json()
 new_access_token = token_response.get("access_token")
-new_refresh_token = token_response.get("refresh_token")
+# FPL doesn't always issue a new refresh_token on every access-token refresh;
+# fall back to the existing one if the response omits it.
+new_refresh_token = token_response.get("refresh_token") or refresh_token
 
-if not new_access_token or not new_refresh_token:
-    raise Exception("❌ Missing tokens in token response")
+if not new_access_token:
+    raise Exception("❌ Missing access_token in token response")
 
 # Step 3: Save updated tokens back to the Gist
 new_content = json.dumps({
