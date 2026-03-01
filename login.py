@@ -14,7 +14,6 @@ load_dotenv()
 URLS = {
     "auth": "https://account.premierleague.com/as/authorize",
     "start": "https://account.premierleague.com/davinci/policy/262ce4b01d19dd9d385d26bddb4297b6/start",
-    "login": "https://account.premierleague.com/davinci/connections/0d8c928e4970386733ce110b9dda8412/capabilities/customHTMLTemplate",
     "resume": "https://account.premierleague.com/as/resume",
     "token": "https://account.premierleague.com/as/token",
     "me": "https://fantasy.premierleague.com/api/me/",
@@ -106,53 +105,66 @@ login_html = auth_response.text
 access_token = re.search(r'"accessToken":"([^"]+)"', login_html).group(1)
 new_state = re.search(r'<input[^>]+name="state"[^>]+value="([^"]+)"', login_html).group(1)
 
-# Step 2: Use accessToken to get interaction id and token
+# Step 2: Start the DaVinci flow
 headers = {
     "Authorization": f"Bearer {access_token}",
     "Content-Type": "application/json",
     "Accept": "application/json",
 }
 start_resp = session.post(URLS["start"], headers=headers)
-data = expect_json(start_resp)
+start_data = expect_json(start_resp)
 
-# Log unexpected payloads
-if "interactionToken" not in data:
-    print("DaVinci /start payload did not include 'interactionToken'. Full payload:", file=sys.stderr)
-    print(json.dumps(data, indent=2)[:4000], file=sys.stderr)
+# The /start response now returns a PingOne Protect SDK polling screen as the
+# first step (bot-detection).  interactionToken is no longer issued; session
+# cookies set during this request handle auth on subsequent calls.
+interaction_id = start_data.get("interactionId")
+node_id        = start_data.get("id")
+connection_id  = start_data.get("connectionId")
 
-# Try common keys and then fail cleanly
-interaction_id = data.get("interactionId") or data.get("id")
-interaction_token = (
-    data.get("interactionToken")
-    or data.get("interactionJwt")
-    or data.get("token")
-)
-
-if not interaction_id or not interaction_token:
+if not interaction_id or not node_id or not connection_id:
+    print("DaVinci /start full payload:", file=sys.stderr)
+    print(json.dumps(start_data, indent=2)[:4000], file=sys.stderr)
     raise RuntimeError(
-        "Login flow changed: missing interactionId/interactionToken from /start. "
-        "See stderr for the raw payload. "
-        "This usually means the IdP returned an error or a different policy branch. "
-        "Try re-running locally to capture the exact payload."
+        f"Login flow error: /start missing required fields "
+        f"(interactionId={interaction_id}, id={node_id}, connectionId={connection_id})"
     )
 
-# Step 3: log in with interaction tokens (2 POST requests)
-response = session.post(
-    URLS["login"],
-    headers={"interactionId": interaction_id, "interactionToken": interaction_token},
+def davinci_url(cid):
+    return (
+        f"https://account.premierleague.com/davinci/connections"
+        f"/{cid}/capabilities/customHTMLTemplate"
+    )
+
+# Step 3a: Advance the Protect SDK polling screen.
+# We submit an empty protectsdk payload (no real browser signals) to move the
+# flow forward to the actual login form.
+protect_resp = session.post(
+    davinci_url(connection_id),
+    headers={"interactionId": interaction_id},
     json={
-        "id": data["id"],
+        "id": node_id,
         "eventName": "continue",
-        "parameters": {"eventType": "polling"},
-        "pollProps": {"status": "continue", "delayInMs": 10, "retriesAllowed": 1, "pollChallengeStatus": False},
+        "parameters": {"protectsdk": ""},
     },
 )
+protect_data = expect_json(protect_resp)
+print("Step 3a (Protect step) response:", file=sys.stderr)
+print(json.dumps(protect_data, indent=2)[:2000], file=sys.stderr)
 
+login_node_id      = protect_data.get("id")
+login_connection_id = protect_data.get("connectionId", connection_id)
+
+if not login_node_id:
+    print("Full Protect step response:", file=sys.stderr)
+    print(json.dumps(protect_data, indent=2)[:4000], file=sys.stderr)
+    raise RuntimeError("Login flow error: no node id in Protect step response")
+
+# Step 3b: Submit credentials to the login form.
 response = session.post(
-    URLS["login"],
-    headers={"interactionId": interaction_id, "interactionToken": interaction_token},
+    davinci_url(login_connection_id),
+    headers={"interactionId": interaction_id},
     json={
-        "id": response.json()["id"],
+        "id": login_node_id,
         "nextEvent": {
             "constructType": "skEvent",
             "eventName": "continue",
@@ -169,9 +181,13 @@ response = session.post(
         "eventName": "continue",
     },
 )
-print("Login step response JSON:")
-print(response.json())
-dv_response = response.json()["dvResponse"]
+login_resp_data = expect_json(response)
+print("Step 3b (login) response:", file=sys.stderr)
+print(json.dumps(login_resp_data, indent=2)[:2000], file=sys.stderr)
+
+dv_response = login_resp_data.get("dvResponse")
+if not dv_response:
+    raise RuntimeError(f"No dvResponse in login response: {json.dumps(login_resp_data)[:2000]}")
 
 # Step 4: Resume login and handle redirect
 response = session.post(
