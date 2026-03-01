@@ -121,9 +121,10 @@ interaction_id = start_data.get("interactionId")
 node_id        = start_data.get("id")
 connection_id  = start_data.get("connectionId")
 
+print("DaVinci /start response:", file=sys.stderr)
+print(json.dumps(start_data, indent=2)[:2000], file=sys.stderr)
+
 if not interaction_id or not node_id or not connection_id:
-    print("DaVinci /start full payload:", file=sys.stderr)
-    print(json.dumps(start_data, indent=2)[:4000], file=sys.stderr)
     raise RuntimeError(
         f"Login flow error: /start missing required fields "
         f"(interactionId={interaction_id}, id={node_id}, connectionId={connection_id})"
@@ -160,25 +161,20 @@ if not login_node_id:
     raise RuntimeError("Login flow error: no node id in Protect step response")
 
 # Step 3b: Submit credentials to the login form.
+# The new DaVinci template does not define a buttonType field and the button's
+# onClick has no postProcess — so we drop nextEvent/buttonType and send only
+# the three fields the form declares: username, password, buttonValue.
 response = session.post(
     davinci_url(login_connection_id),
     headers={"interactionId": interaction_id},
     json={
         "id": login_node_id,
-        "nextEvent": {
-            "constructType": "skEvent",
-            "eventName": "continue",
-            "params": [],
-            "eventType": "post",
-            "postProcess": {},
-        },
+        "eventName": "continue",
         "parameters": {
-            "buttonType": "form-submit",
-            "buttonValue": "SIGNON",
             "username": os.getenv("EMAIL"),
             "password": os.getenv("PASSWORD"),
+            "buttonValue": "",
         },
-        "eventName": "continue",
     },
 )
 login_resp_data = expect_json(response)
