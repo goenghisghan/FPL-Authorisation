@@ -181,9 +181,62 @@ login_resp_data = expect_json(response)
 print("Step 3b (login) response:", file=sys.stderr)
 print(json.dumps(login_resp_data, indent=2)[:2000], file=sys.stderr)
 
+# The flow may insert extra screens after credentials (e.g. a second Protect
+# SDK challenge in a sub-flow).  Loop through them until dvResponse appears.
 dv_response = login_resp_data.get("dvResponse")
+current_node_data = login_resp_data
+current_conn_id   = login_connection_id
+
+for extra_step in range(5):
+    if dv_response:
+        break
+
+    next_node_id = current_node_data.get("id")
+    next_conn_id = current_node_data.get("connectionId", current_conn_id)
+
+    if not next_node_id:
+        print("Full response (stuck, no dvResponse, no node id):", file=sys.stderr)
+        print(json.dumps(current_node_data, indent=2), file=sys.stderr)
+        raise RuntimeError(
+            f"Login stuck: no dvResponse and no next node after {extra_step} extra step(s)"
+        )
+
+    # Build parameters from the fields the screen actually declares.
+    declared_fields = {
+        f.get("propertyName")
+        for f in current_node_data.get("screen", {})
+                                  .get("properties", {})
+                                  .get("formFieldsList", {})
+                                  .get("value", [])
+        if f.get("propertyName")
+    }
+    params = {}
+    if "buttonValue" in declared_fields:
+        params["buttonValue"] = "SIGNON"
+    if "protectsdk" in declared_fields:
+        params["protectsdk"] = ""
+
+    print(
+        f"Extra step {extra_step + 1}: advancing node {next_node_id} "
+        f"(fields={sorted(declared_fields)})",
+        file=sys.stderr,
+    )
+    adv_resp = session.post(
+        davinci_url(next_conn_id),
+        headers={"interactionId": interaction_id},
+        json={"id": next_node_id, "eventName": "continue", "parameters": params},
+    )
+    current_node_data = expect_json(adv_resp)
+    print(f"Extra step {extra_step + 1} response:", file=sys.stderr)
+    print(json.dumps(current_node_data, indent=2)[:2000], file=sys.stderr)
+    current_conn_id = next_conn_id
+    dv_response = current_node_data.get("dvResponse")
+
 if not dv_response:
-    raise RuntimeError(f"No dvResponse in login response: {json.dumps(login_resp_data)[:2000]}")
+    raise RuntimeError(
+        f"Login stuck: no dvResponse after {extra_step + 1} extra step(s). "
+        f"Last node: {json.dumps(current_node_data)[:2000]}"
+    )
 
 # Step 4: Resume login and handle redirect
 response = session.post(
