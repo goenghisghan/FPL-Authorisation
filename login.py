@@ -173,7 +173,7 @@ response = session.post(
         "parameters": {
             "username": os.getenv("EMAIL"),
             "password": os.getenv("PASSWORD"),
-            "buttonValue": "",
+            "buttonValue": "SIGNON",
         },
     },
 )
