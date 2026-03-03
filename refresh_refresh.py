@@ -36,10 +36,10 @@ if response.status_code != 200:
 
 token_response = response.json()
 new_access_token = token_response.get("access_token")
-new_refresh_token = token_response.get("refresh_token")
+new_refresh_token = token_response.get("refresh_token") or refresh_token  # fall back to existing
 
-if not new_access_token or not new_refresh_token:
-    raise Exception("❌ Missing tokens in response.")
+if not new_access_token:
+    raise Exception("❌ Missing access_token in response.")
 
 # Step 3: Save updated tokens back to Gist
 new_content = json.dumps({
